@@ -1,0 +1,44 @@
+name:        boomslang
+version:     0.0.1
+
+category:    Game
+
+synopsis:    boomshine clone
+description: A clone of boomshine (see <http://www.k2xl.com/games/boomshine/>).
+
+author:      Brian Lewis <brian@lorf.org>
+maintainer:  Brian Lewis <brian@lorf.org>
+
+license:     PublicDomain
+
+-- -- -- -- -- -- -- -- -- --
+
+cabal-version: >= 1.6
+build-type:    Simple
+
+-- -- -- -- -- -- -- -- -- --
+
+executable boomslang
+  hs-source-dirs:
+    src
+
+  main-is: Main.hs
+
+  build-depends:
+    GLFW-b                 == 0.*,
+    MonadRandom            == 0.*,
+    OpenGL                 == 2.*,
+    array                  == 0.*,
+    base                   == 4.*,
+    containers             == 0.*,
+    data-accessor          == 0.*,
+    data-accessor-template == 0.*,
+    font-opengl-basic4x6   == 0.*,
+    mtl                    == 1.*
+
+  ghc-options: -Wall -O2
+  if impl(ghc >= 6.8)
+    ghc-options: -fwarn-tabs
+
+  extensions:
+    TemplateHaskell
