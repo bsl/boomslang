@@ -2,20 +2,18 @@ module Game.Logic (logic) where
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
-import Control.Concurrent.MVar (isEmptyMVar, readMVar)
-import Control.Monad           (replicateM, when, unless)
-import Data.Array.Unboxed      ((!))
-import Data.List               ((\\))
+import Control.Monad      (replicateM, when)
+import Data.Array.Unboxed ((!))
+import Data.List          ((\\))
 
 import Data.Accessor.Basic ((^.), (^=), (^:))
 
-import External.Graphics           (adjustAfterWindowResize)
 import External.Graphics.Rendering (renderScene)
 import External.Time               (resetTimer, readTimer, sleep)
 import Game.Activity               (Activity(..))
 import Game.Entity.Dot             (Dot)
 import Game.Entity.Dot.Activity    (Activity(..))
-import Game.G                      (G, ask, get, getRandomR, put, liftIO)
+import Game.G                      (G, ask, get, getRandomR, put)
 import Game.Level                  (Level(..), numDots, numDotsRequired)
 import Game.Score                  (Score(..))
 import qualified External.Input.Keyboard      as Keyboard
@@ -37,8 +35,6 @@ import qualified Space.Position2              as Position2
 logic :: G ()
 logic = do
     resetTimer
-
-    resizeWindowIfNeeded
 
     e <- ask
     s <- get
@@ -313,13 +309,3 @@ updateRoamingDotDisplacement dot =
 n1, p1 :: Double
 n1 = -1
 p1 =  1
-
-resizeWindowIfNeeded :: G ()
-resizeWindowIfNeeded = do
-    s <- get
-    liftIO $ do
-        let ws = s^.State.windowSize
-        empty <- isEmptyMVar ws
-        unless empty $ do
-            (w,h) <- readMVar ws
-            adjustAfterWindowResize w h

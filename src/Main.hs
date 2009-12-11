@@ -10,6 +10,6 @@ import qualified External.Graphics as ExternalGraphics
 
 main :: IO ()
 main = do
-    windowSize <- ExternalGraphics.start
-    runG logic environment (State windowSize Starting NoScore)
+    ExternalGraphics.start
+    runG logic environment (State Starting NoScore)
     ExternalGraphics.end
