@@ -1,6 +1,5 @@
 module Game.Activity
-  ( -- * Types
-    Activity(..)
+  ( Activity (..)
   )
   where
 
@@ -14,8 +13,7 @@ import Game.Level      (Level)
 data Activity
   = Starting
   | PreparingLevel !Level
-  | Playing        !Level ![Dot Double]
-  | Colliding      !Level ![Dot Double] ![Dot Double]
-  | EndingLevel    !Level ![Dot Double]
+  | Playing        !Level ![Dot]
+  | Colliding      !Level ![Dot] ![Dot]
+  | EndingLevel    !Level ![Dot]
   | Quitting
-  deriving (Eq, Show)

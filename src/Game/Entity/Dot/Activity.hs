@@ -1,17 +1,12 @@
 module Game.Entity.Dot.Activity
-  ( -- * Types
-    Activity(..)
+  ( Activity (..)
   )
   where
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
 data Activity
-  = Appearing   !Integer
-  | Roaming
-  | Expanding   !Integer
-  | Holding     !Integer
-  | Contracting !Integer
-  | Ending      !Integer
+  = Roaming
+  | Hit
   | None
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)

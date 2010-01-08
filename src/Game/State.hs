@@ -1,7 +1,5 @@
 module Game.State
-  ( -- * Types
-    State(State)
-    -- * Accessors
+  ( State (State)
   , activity
   , score
   )

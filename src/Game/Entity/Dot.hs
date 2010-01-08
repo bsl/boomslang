@@ -1,14 +1,13 @@
 module Game.Entity.Dot
-  ( -- * Types
-    Dot
-    -- * Constructors
+  ( Dot
   , make
-    -- * Accessors
   , radius
   , color
   , position
-  , displacement
+  , direction
+  , velocity
   , activity
+  , timestamp
   )
   where
 
@@ -17,25 +16,32 @@ module Game.Entity.Dot
 import Data.Accessor.Template (deriveAccessors)
 
 import Game.Entity.Dot.Activity (Activity)
-import Game.Entity.Dot.Radius   (Radius)
-import Graphics.Color           (Color)
-import Space.Displacement2      (Displacement2)
-import Space.Position2          (Position2)
+import Vector                   (Vec)
+import qualified Graphics.Rendering.OpenGL as GL
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
-data Dot a = Dot
-  { radius_       :: !(Radius a)
-  , color_        :: !(Color a)
-  , position_     :: !(Position2 a)
-  , displacement_ :: !(Displacement2 a)
-  , activity_     :: !Activity
-  }
-  deriving (Eq, Show)
+data Dot = Dot
+  { radius_    :: !Double
+  , color_     :: !(GL.Color4 GL.GLfloat)
+  , position_  :: !Vec
+  , direction_ :: !Vec
+  , velocity_  :: !Double
+  , activity_  :: !Activity
+  , timestamp_ :: !Double
+  } deriving (Show, Eq, Ord)
 
 $(deriveAccessors ''Dot)
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
-make :: Radius a -> Color a -> Position2 a -> Displacement2 a -> Activity -> Dot a
+make
+  :: Double
+  -> GL.Color4 GL.GLfloat
+  -> Vec
+  -> Vec
+  -> Double
+  -> Activity
+  -> Double
+  -> Dot
 make = Dot

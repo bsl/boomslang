@@ -2,310 +2,291 @@ module Game.Logic (logic) where
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
-import Control.Monad      (replicateM, when)
-import Data.Array.Unboxed ((!))
-import Data.List          ((\\))
+import Control.Monad (replicateM, liftM2, unless, when)
+import Data.List     ((\\))
 
 import Data.Accessor.Basic ((^.), (^=), (^:))
 
 import External.Graphics.Rendering (renderScene)
-import External.Time               (resetTimer, readTimer, sleep)
+import External.Time               (readTimer, sleep)
 import Game.Activity               (Activity(..))
 import Game.Entity.Dot             (Dot)
 import Game.Entity.Dot.Activity    (Activity(..))
-import Game.G                      (G, ask, get, getRandomR, put)
+import Game.G                      (G, ask, get, getRandomR, put, modify)
 import Game.Level                  (Level(..), numDots, numDotsRequired)
 import Game.Score                  (Score(..))
+import Vector                      ((^-^), (^+^), (.*^))
 import qualified External.Input.Keyboard      as Keyboard
 import qualified External.Input.Keyboard.Keys as Keyboard
 import qualified External.Input.Mouse         as Mouse
 import qualified External.Input.Mouse.Buttons as Mouse
+import qualified Game.Activity                as GameActivity
 import qualified Game.Entity.Dot              as Dot
-import qualified Game.Entity.Dot.Radius       as Radius
+import qualified Game.Entity.Dot.Activity     as DotActivity
 import qualified Game.Environment             as Environment
 import qualified Game.Level                   as Level
 import qualified Game.Score                   as Score
 import qualified Game.State                   as State
-import qualified Graphics.Color               as Color
-import qualified Space.Displacement2          as Displacement2
-import qualified Space.Position2              as Position2
+import qualified Graphics.Rendering.OpenGL    as GL
+import qualified Vector                       as Vector
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
 logic :: G ()
-logic = do
-    resetTimer
-
-    e <- ask
-    s <- get
-
-    q0 <- Keyboard.pressed Keyboard.escape
-    q1 <- Keyboard.pressed Keyboard.q
-    if q0 || q1
-      then put $ State.activity ^= Quitting $ s
-      else do
-          case s^.State.activity of
-            Starting ->
-                put $ State.activity ^= PreparingLevel Level1 $
-                      State.score    ^= NoScore               $ s
-
-            PreparingLevel level ->
-                let nd  = numDots         level
-                    ndr = numDotsRequired level
-                    np  = if s^.State.score == NoScore then 0 else s^.State.score^.Score.numPoints
-                in do
-                    dots <- makeDots nd
-                    put $ State.score    ^= Score nd ndr 0 np  $
-                          State.activity ^= Playing level dots $ s
-
-            Playing level dots -> do
-                dots' <- updateDots dots
-                mxy   <- Mouse.clicked Mouse.left
-                case mxy of
-                  Nothing ->
-                    put $ State.activity ^= Playing level dots' $ s
-                  Just (x,y) ->
-                    let radius       = e^.Environment.normalDotRadius
-                        color        = e^.Environment.placedDotColor
-                        position     = Position2.make x y
-                        displacement = Displacement2.make (0 :: Double) (0 :: Double)
-                        activity     = Expanding (e^.Environment.expandingDotA)
-                        dot          = Dot.make radius color position displacement activity
-                    in put $ State.activity ^= Colliding level [dot] dots' $ s
-
-                renderScene
-
-            Colliding level [] dots ->
-                put $ State.activity ^= activity' $ s
-              where
-                activity' = EndingLevel level dots'
-                dots'     = map (Dot.activity ^= Ending (e^.Environment.endingDotA)) dots
-
-            Colliding level activeDots roamingDots -> do
-                activeDots'  <- updateDots activeDots
-                roamingDots' <- updateDots roamingDots
-                (activeDots'', roamingDots'') <- activate activeDots' roamingDots'
-
-                let a'  = Colliding level activeDots'' roamingDots''
-                let p   = fromIntegral (length activeDots'' - length activeDots')
-                let sc  = s^.State.score
-                let sc' = Score.numDotsActivated ^: (p +) $ sc
-
-                put $ State.activity ^= a'  $
-                      State.score    ^= sc' $ s
-
-                renderScene
-
-            EndingLevel level dots -> do
-                dots' <- updateDots dots
-                if null dots'
-                  then do
-                    let sc = s^.State.score
-                    if (sc^.Score.numDotsActivated) >= (sc^.Score.numDotsRequired)
-                      then
-                        case Level.next level of
-                          Just level' -> put $ State.activity ^= PreparingLevel level'                      $
-                                               State.score^:Score.numPoints^:(+ sc^.Score.numDotsActivated) $ s
-                          Nothing     -> put $ State.activity ^= Starting                                   $
-                                               State.score^:Score.numPoints^:(+ sc^.Score.numDotsActivated) $ s
-                      else put $ State.activity ^= PreparingLevel level $ s
-                  else do
-                      put $ State.activity ^= EndingLevel level dots' $ s
-                      renderScene
-
-            Quitting ->
-                return ()
-
-          t <- fmap ((e^.Environment.secondsPerFrame) -) readTimer
-          when (t > 0) (sleep t)
-
-          when (s^.State.activity /= Quitting) logic
+logic =
+    loopUntilUserQuits $ do
+        t1 <- readTimer
+        s <- get
+        case s^.State.activity of
+          Starting                               -> start
+          PreparingLevel level                   -> prepareLevel level
+          Playing level dots                     -> play level dots
+          Colliding level activeDots roamingDots -> collide level activeDots roamingDots
+          EndingLevel level dots                 -> endLevel level dots
+          Quitting                               -> return ()
+        t2 <- readTimer
+        let diff = t2 - t1
+        when (diff < limit) (sleep $ limit - diff)
+  where
+    limit = 1/60
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
-activate :: [Dot Double] -> [Dot Double] -> G ([Dot Double],[Dot Double])
+unitStep :: Double -> Double
+unitStep n =
+    if n < 0
+      then 0
+      else 1
+
+updateDotRadius :: Dot -> G Dot
+updateDotRadius dot = do
+    t <- readTimer
+    let n = t - dot^.Dot.timestamp
+    case dot^.Dot.activity of
+      Roaming ->
+        if n <= 0.25
+          then let r = 4 * n * normal
+               in return $ Dot.radius ^= r $ dot
+          else return dot
+      Hit ->
+        if n > 3
+           then updateActivity None dot
+           else do
+             let r = if n < 1.0
+                       then normal+adjust*(unitStep (n-exp(-growth))*(log n + growth))/growth
+                       else if n < 2.0
+                              then splode + 0.01 * sin (2*2*pi*(n-1))
+                              else splode*exp(decay*(n-2))
+             return $ Dot.radius ^= r $ dot
+      None -> return $ Dot.radius ^= 0.0 $ dot
+  where
+    normal = 0.04
+    splode = 0.16
+    adjust = abs $ splode - normal
+    growth = 4
+    decay  = negate growth
+
+updateActivity :: DotActivity.Activity -> Dot -> G Dot
+updateActivity a d = do
+    t <- readTimer
+    let dot = Dot.activity  ^= a
+            $ Dot.timestamp ^= t $ d
+    return dot
+
+activate :: [Dot] -> [Dot] -> G ([Dot],[Dot])
 activate activeDots roamingDots = do
-    let newActiveDots = [r | a <- activeDots, r <- roamingDots, areColliding a r]
-    let roamingDots' = roamingDots \\ newActiveDots
+    let newActiveDots = filter (\rd -> any (areColliding rd) activeDots) roamingDots
+        roamingDots' = roamingDots \\ newActiveDots
 
-    e <- ask
-    let a' = Expanding (e^.Environment.expandingDotA)
-    let activeDots' = activeDots ++ map (Dot.activity ^= a') newActiveDots
+    newActiveDots' <- mapM (updateActivity Hit) newActiveDots
 
-    return (activeDots',roamingDots')
+    return (activeDots ++ newActiveDots',roamingDots')
   where
     areColliding d0 d1 =
         xDistance < maxDistance &&
         yDistance < maxDistance &&
-        sqrt (xDistance^(2 :: Int) + yDistance^(2 :: Int)) < maxDistance
+        vDistance < maxDistance
       where
-        xDistance = abs (d0x - d1x)
-        yDistance = abs (d0y - d1y)
-
-        d0x = d0p^.Position2.x
-        d0y = d0p^.Position2.y
+        xDistance = abs $ x1 - x2
+        yDistance = abs $ y1 - y2
+        vDistance = Vector.vlen (d0p ^-^ d1p)
+        maxDistance = realToFrac $ d0^.Dot.radius + d1^.Dot.radius
         d0p = d0^.Dot.position
-
-        d1x = d1p^.Position2.x
-        d1y = d1p^.Position2.y
         d1p = d1^.Dot.position
-
-        maxDistance = r0 + r1
-        r0 = d0^.Dot.radius^.Radius.value
-        r1 = d1^.Dot.radius^.Radius.value
+        x1 = Vector.getX d0p
+        y1 = Vector.getY d0p
+        x2 = Vector.getX d1p
+        y2 = Vector.getY d1p
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
-makeDots :: Integer -> G [Dot Double]
+makeDots :: Integer -> G [Dot]
 makeDots n =
     replicateM (fromIntegral n) makeDot
 
-makeDot :: G (Dot Double)
+makeDot :: G Dot
 makeDot = do
     e <- ask
-    let ac   = e^.Environment.initialDotAlpha
-    let r    = e^.Environment.normalDotRadius
-    let mind = e^.Environment.minDotDisplacement
-    let maxd = e^.Environment.maxDotDisplacement
 
-    rc <- randomDoubleR 0 1
-    gc <- randomDoubleR 0 1
-    bc <- randomDoubleR 0 1
+    -- radius
+    let radius = e^.Environment.normalDotRadius
 
-    px <- randomDoubleR (-0.9) 0.9
-    py <- randomDoubleR (-0.9) 0.9
+    -- color
+    rc <- realToFrac `fmap` randomFloatR 0 1
+    gc <- realToFrac `fmap` randomFloatR 0 1
+    bc <- realToFrac `fmap` randomFloatR 0 1
+    let color = GL.Color4 rc gc bc 0.6
 
-    dx_ <- randomDoubleR mind maxd
-    dy_ <- randomDoubleR mind maxd
+    -- position
+    px <- randomDoubleR (radius-1) (1-radius)
+    py <- randomDoubleR (radius-1) (1-radius)
+    let position = Vector.V (realToFrac px) (realToFrac py)
+
+    -- direction
+    dx_ <- randomDoubleR (1/4) (3/4)
+    let dy_ = sqrt $ 1-dx_**2
     dx <- fmap (\b -> if b then negate dx_ else dx_) randomBool
     dy <- fmap (\b -> if b then negate dy_ else dy_) randomBool
+    let direction = Vector.V (realToFrac dx) (realToFrac dy)
 
-    let radius       = r
-    let color        = Color.make rc gc bc ac
-    let position     = Position2.make px py
-    let displacement = Displacement2.make dx dy
-    let activity     = Appearing (e^.Environment.appearingDotA)
+    -- velocity
+    let velocity = e^.Environment.dotVelocity
 
-    return $ Dot.make radius color position displacement activity
+    -- activity
+    let activity = Roaming
+
+    t <- readTimer
+
+    return $ Dot.make radius color position direction velocity activity t
   where
-    randomDoubleR l h = getRandomR (l,h) :: G Double
+    randomFloatR l h  = getRandomR (l,h)              :: G Float
+    randomDoubleR l h = getRandomR (l,h)              :: G Double
     randomBool        = fmap (== 0) (getRandomR (0,1) :: G Int)
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
-updateDots :: [Dot Double] -> G [Dot Double]
+updateDots :: [Dot] -> G [Dot]
 updateDots =
     fmap (filter isAlive) . mapM updateDot
   where
     isAlive d = d^.Dot.activity /= None
 
-updateDot :: Dot Double -> G (Dot Double)
+updateDot :: Dot -> G Dot
 updateDot dot =
     case dot^.Dot.activity of
-      Appearing   n -> updateAppearingDot   dot n
-      Roaming       -> updateRoamingDot     dot
-      Expanding   n -> updateExpandingDot   dot n
-      Holding     n -> updateHoldingDot     dot n
-      Contracting n -> updateContractingDot dot n
-      Ending      n -> updateEndingDot      dot n
-      None          -> return dot
+      Roaming -> updateRoamingDot dot
+      Hit     -> return dot
+      None    -> return dot
+    >>= updateDotRadius
 
-updateAppearingDot :: Dot Double -> Integer -> G (Dot Double)
-updateAppearingDot dot n =
-    ask                          >>= \e    ->
-    updateRoamingDotPosition dot >>=
-    updateRoamingDotDisplacement >>= \dot' ->
-    return $
-      if n == e^.Environment.appearingDotZ
-        then let r' = e^.Environment.normalDotRadius
-                 a' = Roaming
-             in Dot.radius   ^= r' $
-                Dot.activity ^= a' $ dot'
-        else let r' = Radius.make ((e^.Environment.appearingDotRadii) ! n)
-                 a' = Appearing (succ n)
-             in Dot.radius   ^= r' $
-                Dot.activity ^= a' $ dot'
-
-updateRoamingDot :: Dot Double -> G (Dot Double)
-updateRoamingDot dot =
-    updateRoamingDotPosition dot >>=
-    updateRoamingDotDisplacement
-
-updateExpandingDot :: Dot Double -> Integer -> G (Dot Double)
-updateExpandingDot dot n =
-    ask >>= \e ->
-    return $
-      if n == e^.Environment.expandingDotZ
-        then let a' = Holding (e^.Environment.holdingDotA)
-             in Dot.activity ^= a' $ dot
-        else let r' = Radius.make ((e^.Environment.expandingDotRadii) ! n)
-                 a' = Expanding (succ n)
-             in Dot.radius   ^= r' $
-                Dot.activity ^= a' $ dot
-
-updateHoldingDot :: Dot Double -> Integer -> G (Dot Double)
-updateHoldingDot dot n = do
-    e <- ask
-    return $
-      if n == e^.Environment.holdingDotZ
-        then let a' = Contracting (e^.Environment.contractingDotA)
-             in Dot.activity ^= a' $ dot
-        else let r' = Radius.make ((e^.Environment.holdingDotRadii) ! n)
-                 a' = Holding (succ n)
-             in Dot.radius   ^= r' $
-                Dot.activity ^= a' $ dot
-
-updateContractingDot :: Dot Double -> Integer -> G (Dot Double)
-updateContractingDot dot n = do
-    e <- ask
-    return $
-      if n == e^.Environment.contractingDotZ
-        then Dot.activity ^= None $ dot
-        else let r' = Radius.make ((e^.Environment.contractingDotRadii) ! n)
-                 a' = Contracting (succ n)
-             in Dot.radius   ^= r' $
-                Dot.activity ^= a' $ dot
-
-updateEndingDot :: Dot Double -> Integer -> G (Dot Double)
-updateEndingDot dot n = do
-    e <- ask
-    return $
-      if n == e^.Environment.endingDotZ
-        then Dot.activity ^= None $ dot
-        else let r' = Radius.make ((e^.Environment.endingDotRadii) ! n)
-                 a' = Ending (succ n)
-             in Dot.radius   ^= r' $
-                Dot.activity ^= a' $ dot
+updateRoamingDot :: Dot -> G Dot
+updateRoamingDot dot = do
+    let d   = dot^.Dot.direction
+        dx  = Vector.getX d
+        dy  = Vector.getY d
+        p   = dot^.Dot.position
+        r   = dot^.Dot.radius
+        v   = dot^.Dot.velocity
+        p'  = p ^+^ (realToFrac v .*^ d)
+        p'x = realToFrac $ Vector.getX p'
+        p'y = realToFrac $ Vector.getY p'
+        (p'x',fdx) =
+          if p'x+r > 1
+            then (2-p'x-(2*r),True)
+            else
+              if p'x-r < -1
+                then (-2-p'x+(2*r),True)
+                else (p'x,False)
+        (p'y',fdy) =
+          if p'y+r > 1
+            then (2-p'y-(2*r),True)
+            else
+              if p'y-r < -1
+                then (-2-p'y+(2*r),True)
+                else (p'y,False)
+        p'' = Vector.V (realToFrac p'x') (realToFrac p'y')
+        d'' = Vector.V
+               (if fdx then negate dx else dx)
+               (if fdy then negate dy else dy)
+    return $ Dot.position  ^= p'' $
+             Dot.direction ^= d'' $ dot
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
-updateRoamingDotPosition :: Dot Double -> G (Dot Double)
-updateRoamingDotPosition dot =
-    return $ Dot.position ^= p' $ dot
+loopUntilUserQuits :: G () ->  G ()
+loopUntilUserQuits f = do
+    done <- liftM2 (||) (Keyboard.pressed Keyboard.escape) (Keyboard.pressed Keyboard.q)
+    unless done (f >> loopUntilUserQuits f)
+
+start :: G ()
+start = modify $ (State.activity ^= PreparingLevel Level1) . (State.score ^= NoScore)
+
+prepareLevel :: Level -> G ()
+prepareLevel level = do
+    s <- get
+    dots <- makeDots nd
+    put $ State.score    ^= Score nd ndr 0 (np s) $
+          State.activity ^= Playing level dots    $ s
   where
-    p' = Position2.displace p d
-    p  = dot^.Dot.position
-    d  = dot^.Dot.displacement
+    nd   = numDots         level
+    ndr  = numDotsRequired level
+    np s = if s^.State.score == NoScore then 0 else s^.State.score^.Score.numPoints
 
-updateRoamingDotDisplacement :: Dot Double -> G (Dot Double)
-updateRoamingDotDisplacement dot =
-    let p   = dot^.Dot.position
-        px  = p^.Position2.x
-        py  = p^.Position2.y
+play :: Level -> [Dot] -> G ()
+play level dots = do
+    e <- ask
+    dots' <- updateDots dots
+    mxy   <- Mouse.clicked Mouse.left
+    case mxy of
+      Nothing -> modify $ State.activity ^= Playing level dots'
+      Just (x,y) -> do
+        t <- readTimer
+        let radius    = e^.Environment.normalDotRadius
+            color     = e^.Environment.placedDotColor
+            velocity  = e^.Environment.dotVelocity
+            position  = Vector.V (realToFrac x) (realToFrac y)
+            direction = Vector.vnull
+            activity  = Hit
+            dot       = Dot.make radius color position direction velocity activity t
+        modify $ State.activity ^= Colliding level [dot] dots'
+    renderScene
 
-        d   = dot^.Dot.displacement
-        dx  = d^.Displacement2.x
-        dy  = d^.Displacement2.y
+collide :: Level -> [Dot] -> [Dot] -> G ()
+collide level activeDots roamingDots
+  | null activeDots = do
+      let activity' = EndingLevel level dots'
+          dots'     = map (Dot.activity ^= Hit) roamingDots
+      modify $ State.activity ^= activity'
+  | otherwise = do
+      activeDots'  <- updateDots activeDots
+      roamingDots' <- updateDots roamingDots
+      (activeDots'', roamingDots'') <- activate activeDots' roamingDots'
 
-        rv  = dot^.Dot.radius^.Radius.value
+      s <- get
+      let a'  = Colliding level activeDots'' roamingDots''
+          p   = fromIntegral $ length activeDots'' - length activeDots'
+          sc  = s^.State.score
+          sc' = Score.numDotsActivated ^: (p +) $ sc
 
-        dx' = if px < n1 + rv || px > p1 - rv then negate dx else dx
-        dy' = if py < n1 + rv || py > p1 - rv then negate dy else dy
-        d'  = Displacement2.make dx' dy'
-    in return $ Dot.displacement ^= d' $ dot
+      put $ State.activity ^= a'  $
+            State.score    ^= sc' $ s
+      renderScene
 
--- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-
-n1, p1 :: Double
-n1 = -1
-p1 =  1
+endLevel :: Level -> [Dot] -> G ()
+endLevel level dots = do
+    dots' <- updateDots dots
+    s <- get
+    if null dots'
+      then do
+          let sc = s^.State.score
+          if (sc^.Score.numDotsActivated) >= (sc^.Score.numDotsRequired)
+            then
+              case Level.next level of
+                Just level' -> put $ State.activity ^= PreparingLevel level'                      $
+                                     State.score^:Score.numPoints^:(+ sc^.Score.numDotsActivated) $ s
+                Nothing     -> put $ State.activity ^= Starting                                   $
+                                     State.score^:Score.numPoints^:(+ sc^.Score.numDotsActivated) $ s
+            else put $ State.activity ^= PreparingLevel level $ s
+      else do
+          put $ State.activity ^= EndingLevel level dots' $ s
+          renderScene

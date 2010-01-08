@@ -22,8 +22,8 @@ clicked b = liftIO $ do
           (x, y) <- GLFW.getMousePosition
           (w, h) <- GLFW.getWindowDimensions
           let w2 = fromIntegral w / 2
-          let h2 = fromIntegral h / 2
-          let x' = (fromIntegral x - w2) / w2
-          let y' = (h2 - fromIntegral y) / h2
+              h2 = fromIntegral h / 2
+              x' = (fromIntegral x - w2) / w2
+              y' = (h2 - fromIntegral y) / h2
           return $ Just (x',y')
       else return Nothing

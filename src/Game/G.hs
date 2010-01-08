@@ -14,6 +14,7 @@ module Game.G
     -- ** State
   , get
   , put
+  , modify
     -- ** IO
   , liftIO
   )
@@ -23,7 +24,7 @@ module Game.G
 
 import Control.Monad.Random       (MonadRandom, RandT, StdGen, evalRandT, getRandomR, newStdGen)
 import Control.Monad.Reader       (MonadReader, ReaderT, runReaderT, ask, asks)
-import Control.Monad.State.Strict (MonadState, StateT, evalStateT, get, put)
+import Control.Monad.State.Strict (MonadState, StateT, evalStateT, get, put, modify)
 import Control.Monad.Trans        (MonadIO, liftIO)
 
 import Game.Environment (Environment)

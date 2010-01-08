@@ -1,170 +1,98 @@
 module Game.Environment
-  ( -- * Types
-    Environment(Environment)
-    -- * Accessors
-  , secondsPerFrame
+  ( Environment (Environment)
   , normalDotRadius
-  , normalDotRadiusValue
   , placedDotColor
-  , initialDotAlpha
-  , minDotDisplacement
-  , maxDotDisplacement
-
-  , appearingDotA
-  , appearingDotZ
-  , appearingDotRadii
-
-  , expandingDotA
-  , expandingDotZ
-  , expandingDotRadii
-
-  , holdingDotA
-  , holdingDotZ
-  , holdingDotRadii
-
-  , contractingDotA
-  , contractingDotZ
-  , contractingDotRadii
-
-  , endingDotA
-  , endingDotZ
-  , endingDotRadii
-
-    -- * Utilities
+  , dotVelocity
+  , framesPerSecond
+  , discDisplayList
+  , charMap
   , environment
   )
   where
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
-import Data.Array.Unboxed (UArray, listArray)
+import Control.Monad          (forM)
+import Data.Char              (ord)
+import qualified Data.IntMap as M
 
 import Data.Accessor.Template (deriveAccessors)
 
-import Game.Entity.Dot.Radius (Radius)
-import Graphics.Color         (Color)
-import qualified Game.Entity.Dot.Radius as Radius
-import qualified Graphics.Color         as Color
+import qualified Graphics.Fonts.OpenGL.Basic4x6 as Basic4x6
+import qualified Graphics.Rendering.OpenGL      as GL
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
 data Environment = Environment
-  { normalDotRadius_      :: !(Radius Double)
-  , normalDotRadiusValue_ :: !Double
-  , placedDotColor_       :: !(Color Double)
-  , initialDotAlpha_      :: !Double
-  , minDotDisplacement_   :: !Double
-  , maxDotDisplacement_   :: !Double
-  , secondsPerFrame_      :: !Double
-
-  , appearingDotA_        :: !Integer
-  , appearingDotZ_        :: !Integer
-  , appearingDotRadii_    :: !(UArray Integer Double)
-
-  , expandingDotA_        :: !Integer
-  , expandingDotZ_        :: !Integer
-  , expandingDotRadii_    :: !(UArray Integer Double)
-
-  , holdingDotA_          :: !Integer
-  , holdingDotZ_          :: !Integer
-  , holdingDotRadii_      :: !(UArray Integer Double)
-
-  , contractingDotA_      :: !Integer
-  , contractingDotZ_      :: !Integer
-  , contractingDotRadii_  :: !(UArray Integer Double)
-
-  , endingDotA_           :: !Integer
-  , endingDotZ_           :: !Integer
-  , endingDotRadii_       :: !(UArray Integer Double)
+  { normalDotRadius_ :: !Double
+  , placedDotColor_  :: !(GL.Color4 GL.GLfloat)
+  , dotVelocity_     :: !Double
+  , framesPerSecond_ :: !Double
+  , discDisplayList_ :: !GL.DisplayList
+  , charMap_         :: !(M.IntMap GL.DisplayList)
   }
-  deriving Show
 
 $(deriveAccessors ''Environment)
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
-environment :: Environment
-environment =
-    Environment
-      { secondsPerFrame_      = recip (fromIntegral framesPerSecond)
-      , normalDotRadius_      = Radius.make normalDotRadiusValue'
-      , normalDotRadiusValue_ = normalDotRadiusValue'
-      , placedDotColor_       = Color.make (1 :: Double) (1 :: Double) (1 :: Double) initialDotAlpha'
-      , initialDotAlpha_      = initialDotAlpha'
-      , minDotDisplacement_   = 0.0004 :: Double
-      , maxDotDisplacement_   = 0.0025 :: Double
+disc :: IO ()
+disc =
+    GL.renderPrimitive GL.TriangleFan $
+      mapM_ GL.vertex (centralVertex : outerVertices)
+  where
+    centralVertex = GL.Vertex2 0 0
+    outerVertices = [ GL.Vertex2 (cos r) (sin r) | r <- [0::GL.GLdouble,2*pi/360*12..2*pi] ]
 
-      , appearingDotA_ = appearingDotA'
-      , appearingDotZ_ = appearingDotZ'
-      , appearingDotRadii_ =
-          let maxX = 0.2
-              a    = 1
-              m    = 100
-              d    = log (m * maxX + a) / normalDotRadiusValue'
-              xd   = maxX / fromIntegral appearingDotZ'
-          in listArray
-               (appearingDotA', appearingDotZ')
-               [log (m * x + a) / d | x <- tail [0,xd..maxX] :: [Double]]
-
-      , expandingDotA_ = expandingDotA'
-      , expandingDotZ_ = expandingDotZ'
-      , expandingDotRadii_ =
-          let maxX = 0.2
-              a    = 1
-              m    = 200
-              d    = log (m * maxX + a) / (expandedDotRadiusValue' - normalDotRadiusValue')
-              xd   = maxX / fromIntegral expandingDotZ'
-          in listArray
-               (expandingDotA', expandingDotZ')
-               [normalDotRadiusValue' + log (m * x + a) / d | x <- tail [0,xd..maxX] :: [Double]]
-
-      , contractingDotA_ = expandingDotA'
-      , contractingDotZ_ = expandingDotZ'
-      , contractingDotRadii_ =
-          let maxX = 0.05
-              a    = 1
-              m    = 50
-              d    = log (m * maxX + a) / expandedDotRadiusValue'
-              xd   = maxX / fromIntegral expandingDotZ'
-          in listArray
-               (expandingDotA', expandingDotZ')
-               (reverse [log (m * x + a) / d | x <- tail [0,xd..maxX] :: [Double]])
-
-      , holdingDotA_ = holdingDotA'
-      , holdingDotZ_ = holdingDotZ'
-      , holdingDotRadii_ =
-          let maxX = pi / 8
-              xd   = maxX / fromIntegral holdingDotZ'
-          in listArray
-               (holdingDotA', holdingDotZ')
-               (reverse [expandedDotRadiusValue' + (0.005 * sin (40 * x)) | x <- tail [0,xd..maxX] :: [Double]])
-
-      , endingDotA_ = endingDotA'
-      , endingDotZ_ = endingDotZ'
-      , endingDotRadii_ =
-          let maxX = 0.05
-              a    = 1
-              m    = 50
-              d    = log (m * maxX + a) / normalDotRadiusValue'
-              xd   = maxX / fromIntegral endingDotZ'
-          in listArray
-               (endingDotA', endingDotZ')
-               (reverse [log (m * x + a) / d | x <- tail [0,xd..maxX] :: [Double]])
+environment :: IO Environment
+environment = do
+    discDisplayList' <- GL.defineNewList GL.Compile disc
+    charMap' <- charToDisplayList
+    return Environment
+      { normalDotRadius_   = normalDotRadius'
+      , placedDotColor_    = translucentWhite
+      , dotVelocity_       = 0.25 / framesPerSecond'
+      , framesPerSecond_   = framesPerSecond'
+      , discDisplayList_   = discDisplayList'
+      , charMap_           = charMap'
       }
   where
-    normalDotRadiusValue'   = 0.04 :: Double
-    expandedDotRadiusValue' = 0.16 :: Double
-    initialDotAlpha'        = 0.6  :: Double
-    framesPerSecond         = 150  :: Integer
+    normalDotRadius' = 0.04 :: Double
+    framesPerSecond' = 60   :: Double
 
-    appearingDotA' = 1
-    appearingDotZ' = 50
+translucentWhite :: GL.Color4 GL.GLfloat
+translucentWhite = GL.Color4 1 1 1 0.6
 
-    expandingDotA' = 1
-    expandingDotZ' = 50
+charToDisplayList :: IO (M.IntMap GL.DisplayList)
+charToDisplayList =
+    M.fromList `fmap` charDisplayLists
 
-    holdingDotA'   = 1
-    holdingDotZ'   = 250
+charDisplayLists :: IO [(Int,GL.DisplayList)]
+charDisplayLists =
+    forM chars $ \(c,f) -> do
+        dl <- GL.defineNewList GL.Compile f
+        return (ord c,dl)
 
-    endingDotA'    = 1
-    endingDotZ'    = 30
+chars :: [(Char,IO ())]
+chars =
+    [ ('0', Basic4x6.digit0)
+    , ('1', Basic4x6.digit1)
+    , ('2', Basic4x6.digit2)
+    , ('3', Basic4x6.digit3)
+    , ('4', Basic4x6.digit4)
+    , ('5', Basic4x6.digit5)
+    , ('6', Basic4x6.digit6)
+    , ('7', Basic4x6.digit7)
+    , ('8', Basic4x6.digit8)
+    , ('9', Basic4x6.digit9)
+    , ('!', Basic4x6.exclamation)
+    , ('%', Basic4x6.percent)
+    , ('+', Basic4x6.plus)
+    , ('-', Basic4x6.minus)
+    , ('.', Basic4x6.period)
+    , ('/', Basic4x6.slash)
+    , (':', Basic4x6.colon)
+    , ('<', Basic4x6.lessThan)
+    , ('=', Basic4x6.equal)
+    , ('>', Basic4x6.greaterThan)
+    ]

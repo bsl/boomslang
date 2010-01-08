@@ -9,7 +9,7 @@ import Game.State       (State(State))
 import qualified External.Graphics as ExternalGraphics
 
 main :: IO ()
-main = do
-    ExternalGraphics.start
-    runG logic environment (State Starting NoScore)
-    ExternalGraphics.end
+main =
+    ExternalGraphics.withGraphics $ do
+      env <- environment
+      runG logic env (State Starting NoScore)
