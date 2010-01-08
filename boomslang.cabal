@@ -18,6 +18,25 @@ build-type:    Simple
 
 -- -- -- -- -- -- -- -- -- --
 
+extra-source-files:
+  src/External/Graphics.hs
+  src/External/Graphics/Rendering.hs
+  src/External/Input/Keyboard.hs
+  src/External/Input/Keyboard/Keys.hs
+  src/External/Input/Mouse.hs
+  src/External/Input/Mouse/Buttons.hs
+  src/External/Time.hs
+  src/Game/Activity.hs
+  src/Game/Entity/Dot.hs
+  src/Game/Entity/Dot/Activity.hs
+  src/Game/Environment.hs
+  src/Game/G.hs
+  src/Game/Level.hs
+  src/Game/Logic.hs
+  src/Game/Score.hs
+  src/Game/State.hs
+  src/Vector.hs
+
 executable boomslang
   hs-source-dirs:
     src
