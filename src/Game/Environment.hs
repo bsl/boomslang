@@ -51,7 +51,7 @@ environment = do
     return Environment
       { normalDotRadius_   = normalDotRadius'
       , placedDotColor_    = translucentWhite
-      , dotVelocity_       = 0.25 / framesPerSecond'
+      , dotVelocity_       = 0.2 / framesPerSecond'
       , framesPerSecond_   = framesPerSecond'
       , discDisplayList_   = discDisplayList'
       , charMap_           = charMap'

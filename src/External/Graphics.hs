@@ -30,7 +30,7 @@ start = do
       , GLFW.displayOptions_numGreenBits      = 5
       , GLFW.displayOptions_numBlueBits       = 5
       , GLFW.displayOptions_numAlphaBits      = 5
-      , GLFW.displayOptions_numFsaaSamples    = Just 4
+      , GLFW.displayOptions_numFsaaSamples    = Just 8
       , GLFW.displayOptions_windowIsResizable = True
       }
     GLFW.setWindowTitle "boomslang"
@@ -43,19 +43,22 @@ start = do
 
     GL.clearColor $= GL.Color4 0.025 0.025 0.025 1
 
-    GL.multisample   $= GL.Enabled
-    GL.blend         $= GL.Enabled
-    GL.blendFunc     $= (GL.SrcAlpha, GL.OneMinusSrcAlpha)
+    GL.multisample $= GL.Enabled
+    GL.blend       $= GL.Enabled
+    GL.blendFunc   $= (GL.SrcAlpha, GL.OneMinusSrcAlpha)
+
+    {-
     GL.colorMaterial $= Just (GL.Front, GL.AmbientAndDiffuse)
     GL.depthFunc     $= Nothing
 
     let light0 = GL.Light 0
+    GL.light    light0 $= GL.Enabled
     GL.ambient  light0 $= GL.Color4 0.3 0.3 0.3 1
     GL.diffuse  light0 $= GL.Color4 0.6 0.6 0.6 1
     GL.specular light0 $= GL.Color4 0.1 0.1 0.1 1
     GL.position light0 $= GL.Vertex4 0 0 2 1
-    GL.light    light0 $= GL.Enabled
     GL.lighting        $= GL.Enabled
+    -}
 
 end :: IO ()
 end = do

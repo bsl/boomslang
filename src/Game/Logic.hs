@@ -64,26 +64,23 @@ updateDotRadius dot = do
     let n = t - dot^.Dot.timestamp
     case dot^.Dot.activity of
       Roaming ->
-        if n <= 0.25
-          then let r = 4 * n * normal
+        if n <= 0.1
+          then let r = 10 * n * normal
                in return $ Dot.radius ^= r $ dot
           else return dot
       Hit ->
         if n > 3
            then updateActivity None dot
-           else do
-             let r = if n < 1.0
-                       then normal+adjust*(unitStep (n-exp(-growth))*(log n + growth))/growth
-                       else if n < 2.0
-                              then splode + 0.01 * sin (2*2*pi*(n-1))
-                              else splode*exp(decay*(n-2))
-             return $ Dot.radius ^= r $ dot
-      None -> return $ Dot.radius ^= 0.0 $ dot
+           else let r = if n < 2
+                          then normal + adjust * (unitStep (n-exp(-growth))*(log n + growth))/growth
+                          else splode * exp (decay * (n-2))
+                in return $ Dot.radius ^= r $ dot
+      None -> return $ Dot.radius ^= 0 $ dot
   where
     normal = 0.04
     splode = 0.16
     adjust = abs $ splode - normal
-    growth = 4
+    growth = 5
     decay  = negate growth
 
 updateActivity :: DotActivity.Activity -> Dot -> G Dot
@@ -97,10 +94,8 @@ activate :: [Dot] -> [Dot] -> G ([Dot],[Dot])
 activate activeDots roamingDots = do
     let newActiveDots = filter (\rd -> any (areColliding rd) activeDots) roamingDots
         roamingDots' = roamingDots \\ newActiveDots
-
     newActiveDots' <- mapM (updateActivity Hit) newActiveDots
-
-    return (activeDots ++ newActiveDots',roamingDots')
+    return (activeDots ++ newActiveDots', roamingDots')
   where
     areColliding d0 d1 =
         xDistance < maxDistance &&
