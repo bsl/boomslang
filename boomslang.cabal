@@ -28,12 +28,10 @@ executable boomslang
     GLFW-b                 == 0.*,
     MonadRandom            == 0.*,
     OpenGL                 == 2.4.*,
-    array                  == 0.*,
     base                   == 4.*,
     containers             == 0.*,
     data-accessor          == 0.*,
     data-accessor-template == 0.*,
-    template-haskell       == 2.3.*,
     font-opengl-basic4x6   == 0.*,
     mtl                    == 1.*
 
