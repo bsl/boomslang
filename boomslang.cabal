@@ -6,8 +6,8 @@ category:    Game
 synopsis:    boomshine clone
 description: A clone of boomshine (see <http://www.k2xl.com/games/boomshine/>).
 
-author:      Brian Lewis <brian@lorf.org>
-maintainer:  Brian Lewis <brian@lorf.org>
+author:      Brian Lewis <brian@lorf.org>, Ian Taylor <ian@lorf.org>
+maintainer:  Brian Lewis <brian@lorf.org>, Ian Taylor <ian@lorf.org>
 
 license:     PublicDomain
 
