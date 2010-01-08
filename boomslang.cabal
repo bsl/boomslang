@@ -3,8 +3,8 @@ version:     0.0.1
 
 category:    Game
 
-synopsis:    boomshine clone
-description: A clone of boomshine (see <http://www.k2xl.com/games/boomshine/>).
+synopsis:    Boomshine clone
+description: A clone of Boomshine (see <http://www.k2xl.com/games/boomshine/>).
 
 author:      Brian Lewis <brian@lorf.org>, Ian Taylor <ian@lorf.org>
 maintainer:  Brian Lewis <brian@lorf.org>, Ian Taylor <ian@lorf.org>
