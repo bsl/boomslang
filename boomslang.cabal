@@ -41,3 +41,9 @@ executable boomslang
 
   extensions:
     TemplateHaskell
+
+-- -- -- -- -- -- -- -- -- --
+
+source-repository head
+  type:     git
+  location: git://github.com/bsl/boomslang.git
