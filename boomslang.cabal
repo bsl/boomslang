@@ -43,17 +43,29 @@ executable boomslang
 
   main-is: Main.hs
 
-  build-depends:
-    GLFW-b                 == 0.*,
-    MonadRandom            == 0.*,
-    OpenGL                 == 2.4.*,
-    base                   == 4.*,
-    containers             == 0.*,
-    data-accessor          == 0.*,
-    data-accessor-template == 0.*,
-    font-opengl-basic4x6   == 0.*,
-    mtl                    == 1.*,
-    template-haskell       == 2.3.*
+  if impl(ghc >= 6.12)
+    build-depends:
+      GLFW-b                 == 0.*,
+      MonadRandom            == 0.*,
+      OpenGL                 == 2.4.*,
+      base                   == 4.*,
+      containers             == 0.*,
+      data-accessor          == 0.*,
+      data-accessor-template == 0.*,
+      font-opengl-basic4x6   == 0.*,
+      mtl                    == 1.*
+  else
+    build-depends:
+      GLFW-b                 == 0.*,
+      MonadRandom            == 0.*,
+      OpenGL                 == 2.4.*,
+      base                   == 4.*,
+      containers             == 0.*,
+      data-accessor          == 0.*,
+      data-accessor-template == 0.*,
+      font-opengl-basic4x6   == 0.*,
+      mtl                    == 1.*,
+      template-haskell       == 2.3.*
 
   ghc-options: -Wall -O2 -funbox-strict-fields
   if impl(ghc >= 6.8)
