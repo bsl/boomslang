@@ -11,5 +11,5 @@ import qualified External.Graphics as ExternalGraphics
 main :: IO ()
 main =
     ExternalGraphics.withGraphics $ do
-      env <- environment
-      runG logic env (State Starting NoScore)
+        env <- environment
+        runG logic env (State Starting NoScore)

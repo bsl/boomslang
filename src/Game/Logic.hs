@@ -17,10 +17,7 @@ import Game.Level                  (Level(..), numDots, numDotsRequired)
 import Game.Score                  (Score(..))
 import Vector                      ((^-^), (^+^), (.*^))
 import qualified External.Input.Keyboard      as Keyboard
-import qualified External.Input.Keyboard.Keys as Keyboard
 import qualified External.Input.Mouse         as Mouse
-import qualified External.Input.Mouse.Buttons as Mouse
-import qualified Game.Activity                as GameActivity
 import qualified Game.Entity.Dot              as Dot
 import qualified Game.Entity.Dot.Activity     as DotActivity
 import qualified Game.Environment             as Environment

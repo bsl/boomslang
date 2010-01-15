@@ -5,7 +5,7 @@ module External.Graphics
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
-import Control.Exception (finally)
+import Control.Monad (when)
 
 import Graphics.Rendering.OpenGL (($=))
 
@@ -14,51 +14,45 @@ import qualified Graphics.UI.GLFW          as GLFW
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
-withGraphics :: IO a -> IO a
+withGraphics :: IO () -> IO ()
 withGraphics action =
-    (start >> action) `finally` end
+    start >>= flip when (action >> end)
 
 -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
 
-start :: IO ()
+start :: IO Bool
 start = do
-    GLFW.initialize
-    GLFW.openWindow GLFW.defaultDisplayOptions
-      { GLFW.displayOptions_width             = 600
-      , GLFW.displayOptions_height            = 600
-      , GLFW.displayOptions_numRedBits        = 5
-      , GLFW.displayOptions_numGreenBits      = 5
-      , GLFW.displayOptions_numBlueBits       = 5
-      , GLFW.displayOptions_numAlphaBits      = 5
-      , GLFW.displayOptions_numFsaaSamples    = Just 8
-      , GLFW.displayOptions_windowIsResizable = True
-      }
-    GLFW.setWindowTitle "boomslang"
+    r0 <- GLFW.initialize
+    if not r0
+      then return False
+      else do
+          r1 <- GLFW.openWindow GLFW.defaultDisplayOptions
+                  { GLFW.displayOptions_width             = 600
+                  , GLFW.displayOptions_height            = 600
+                  , GLFW.displayOptions_numRedBits        = 5
+                  , GLFW.displayOptions_numGreenBits      = 5
+                  , GLFW.displayOptions_numBlueBits       = 5
+                  , GLFW.displayOptions_numAlphaBits      = 5
+                  , GLFW.displayOptions_numFsaaSamples    = Just 8
+                  , GLFW.displayOptions_windowIsResizable = True
+                  }
+          if not r1
+            then return False
+            else do
+                GLFW.setWindowTitle "boomslang"
 
-    GLFW.setWindowSizeCallback $ \w h -> do
-        GL.viewport   $= (GL.Position 0 0, GL.Size (fromIntegral w) (fromIntegral h))
-        GL.matrixMode $= GL.Projection
-        GL.loadIdentity
-        GL.ortho2D 0 (realToFrac w) (realToFrac h) 0
+                GLFW.setWindowSizeCallback $ \w h -> do
+                    GL.viewport   $= (GL.Position 0 0, GL.Size (fromIntegral w) (fromIntegral h))
+                    GL.matrixMode $= GL.Projection
+                    GL.loadIdentity
+                    GL.ortho2D 0 (realToFrac w) (realToFrac h) 0
 
-    GL.clearColor $= GL.Color4 0.025 0.025 0.025 1
+                GL.multisample $= GL.Enabled
+                GL.blend       $= GL.Enabled
+                GL.blendFunc   $= (GL.SrcAlpha, GL.OneMinusSrcAlpha)
+                GL.clearColor  $= GL.Color4 0.025 0.025 0.025 1
 
-    GL.multisample $= GL.Enabled
-    GL.blend       $= GL.Enabled
-    GL.blendFunc   $= (GL.SrcAlpha, GL.OneMinusSrcAlpha)
-
-    {-
-    GL.colorMaterial $= Just (GL.Front, GL.AmbientAndDiffuse)
-    GL.depthFunc     $= Nothing
-
-    let light0 = GL.Light 0
-    GL.light    light0 $= GL.Enabled
-    GL.ambient  light0 $= GL.Color4 0.3 0.3 0.3 1
-    GL.diffuse  light0 $= GL.Color4 0.6 0.6 0.6 1
-    GL.specular light0 $= GL.Color4 0.1 0.1 0.1 1
-    GL.position light0 $= GL.Vertex4 0 0 2 1
-    GL.lighting        $= GL.Enabled
-    -}
+                return True
 
 end :: IO ()
 end = do

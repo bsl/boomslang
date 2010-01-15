@@ -4,7 +4,6 @@ module External.Graphics.Rendering (renderScene) where
 
 import Control.Monad (unless)
 import Data.Char     (ord)
-import Data.Maybe    (maybe)
 import qualified Data.IntMap as M
 
 import Data.Accessor.Basic ((^.))
