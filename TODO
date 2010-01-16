@@ -1,0 +1,12 @@
+Preserve the aspect ratio when the window is resized.
+
+Consider using Applicative like
+  let comp = realToFrac <$> randomFloatR 0 1
+  color <- GL.Color4 <$> comp <*> comp <*> comp <*> pure 0.6
+
+Improve random color selection so we don't pick anything ugly or hard to see.
+
+Consider replacing ReaderT and Environment with a "Settings" or "Configuration"
+module.
+
+Make functions pure whenever possible.
