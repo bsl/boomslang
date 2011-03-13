@@ -53,7 +53,7 @@ executable boomslang
       data-accessor          == 0.*,
       data-accessor-template == 0.*,
       font-opengl-basic4x6   == 0.*,
-      mtl                    == 1.*
+      mtl                    == 1.* || == 2.*
   else
     build-depends:
       GLFW-b                 == 0.*,
