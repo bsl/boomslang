@@ -182,20 +182,14 @@ updateRoamingDot dot = do
         p'  = p ^+^ (realToFrac v .*^ d)
         p'x = realToFrac $ Vector.getX p'
         p'y = realToFrac $ Vector.getY p'
-        (p'x',fdx) =
-          if p'x+r > 1
-            then (2-p'x-(2*r),True)
-            else
-              if p'x-r < -1
-                then (-2-p'x+(2*r),True)
-                else (p'x,False)
-        (p'y',fdy) =
-          if p'y+r > 1
-            then (2-p'y-(2*r),True)
-            else
-              if p'y-r < -1
-                then (-2-p'y+(2*r),True)
-                else (p'y,False)
+        (p'x',fdx)
+          | p'x+r >  1 = (2-p'x-(2*r),True)
+          | p'x-r < -1 = (-2-p'x+(2*r),True)
+          | otherwise  = (p'x,False)
+        (p'y',fdy)
+          | p'y+r >  1 = (2-p'y-(2*r),True)
+          | p'y-r < -1 = (-2-p'y+(2*r),True)
+          | otherwise  = (p'y,False)
         p'' = Vector.V (realToFrac p'x') (realToFrac p'y')
         d'' = Vector.V
                (if fdx then negate dx else dx)
