@@ -1,5 +1,5 @@
 name:        boomslang
-version:     0.0.3
+version:     0.0.4
 
 category:    Game
 
@@ -47,7 +47,7 @@ executable boomslang
     build-depends:
       GLFW-b                 == 0.*,
       MonadRandom            == 0.*,
-      OpenGL                 == 2.4.*,
+      OpenGL                 == 2.5.*,
       base                   == 4.*,
       containers             == 0.*,
       data-accessor          == 0.*,
@@ -58,7 +58,7 @@ executable boomslang
     build-depends:
       GLFW-b                 == 0.*,
       MonadRandom            == 0.*,
-      OpenGL                 == 2.4.*,
+      OpenGL                 == 2.5.*,
       base                   == 4.*,
       containers             == 0.*,
       data-accessor          == 0.*,
